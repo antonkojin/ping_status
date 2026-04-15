@@ -215,7 +215,9 @@ fun DeviceMonitorScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 onClick = {
                     if (viewModel.isMonitoring) viewModel.toggleMonitoring(false)
                     else {
@@ -230,7 +232,10 @@ fun DeviceMonitorScreen(
                     }
                 }
             ) {
-                Text(if (viewModel.isMonitoring) "Stop Monitoring" else "Start Monitoring")
+                Text(
+                    text = if (viewModel.isMonitoring) "Stop Monitoring" else "Start Monitoring",
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
         }
     }
@@ -291,7 +296,7 @@ fun DeviceStatusItem(
     ) {
         Row(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(12.dp, 12.dp)
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -429,13 +434,17 @@ fun AddEditDeviceScreen(
             if (device != null) {
                 OutlinedButton(
                     onClick = { showDeleteConfirmation = true },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        null
-                    ); Spacer(Modifier.width(8.dp)); Text("Delete Device")
+                    Icon(Icons.Default.Delete, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Delete Device",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         }
