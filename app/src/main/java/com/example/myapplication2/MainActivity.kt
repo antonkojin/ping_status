@@ -416,12 +416,12 @@ fun AddEditDeviceScreen(
             ) {
                 Row(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(16.dp, 0.dp)
                         .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Enable Monitoring", style = MaterialTheme.typography.titleMedium)
+                    Text("Enable Monitoring", style = MaterialTheme.typography.bodyMedium)
                     Switch(checked = isEnabled, onCheckedChange = { isEnabled = it })
                 }
             }
