@@ -56,7 +56,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -105,41 +104,17 @@ private fun isServiceRunning(context: Context): Boolean {
 
 @Composable
 fun MainNavigation(viewModel: DeviceViewModel) {
-    val onBack = {
-        viewModel.isAdding = false
-        viewModel.editingDevice = null
-        viewModel.saveDevices()
-    }
-
     if (viewModel.isAdding || viewModel.editingDevice != null) {
-        AddEditDeviceScreen(
-            device = viewModel.editingDevice,
-            devices = viewModel.devices,
-            onBack = onBack
-        )
+        AddEditDeviceScreen(viewModel = viewModel)
     } else {
-        DeviceMonitorScreen(
-            devices = viewModel.devices,
-            deviceStatuses = viewModel.deviceStatuses,
-            isMonitoring = viewModel.isMonitoring,
-            onToggleMonitoring = viewModel::toggleMonitoring,
-            onAddDevice = { viewModel.isAdding = true },
-            onEditDevice = { viewModel.editingDevice = it },
-            onReorder = viewModel::saveDevices
-        )
+        DeviceMonitorScreen(viewModel = viewModel)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeviceMonitorScreen(
-    devices: SnapshotStateList<Device>,
-    deviceStatuses: Map<String, Boolean>,
-    isMonitoring: Boolean,
-    onToggleMonitoring: (Boolean) -> Unit,
-    onAddDevice: () -> Unit,
-    onEditDevice: (Device) -> Unit,
-    onReorder: () -> Unit
+    viewModel: DeviceViewModel
 ) {
     val context = LocalContext.current
     val lazyListState = rememberLazyListState()
@@ -148,14 +123,14 @@ fun DeviceMonitorScreen(
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { if (it) onToggleMonitoring(true) }
+    ) { if (it) viewModel.toggleMonitoring(true) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("PingStatus") },
                 actions = {
-                    IconButton(onClick = onAddDevice) {
+                    IconButton(onClick = { viewModel.startAdding() }) {
                         Icon(Icons.Default.Add, contentDescription = "Add")
                     }
                 }
@@ -168,7 +143,7 @@ fun DeviceMonitorScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            if (devices.isEmpty()) {
+            if (viewModel.devices.isEmpty()) {
                 EmptyState()
             } else {
                 LazyColumn(
@@ -180,7 +155,7 @@ fun DeviceMonitorScreen(
                                 onDragStart = { offset ->
                                     lazyListState.layoutInfo.visibleItemsInfo
                                         .firstOrNull { offset.y.toInt() in it.offset..(it.offset + it.size) }
-                                        ?.takeIf { it.index < devices.size }
+                                        ?.takeIf { it.index < viewModel.devices.size }
                                         ?.let { draggedItemIndex = it.index }
                                 },
                                 onDrag = { change, dragAmount ->
@@ -193,37 +168,39 @@ fun DeviceMonitorScreen(
                                         val currentCenter =
                                             currentItem.offset + currentItem.size / 2 + draggingOffset
                                         visibleItems.firstOrNull { it.index != draggedItemIndex && currentCenter.toInt() in it.offset..(it.offset + it.size) }
-                                            ?.takeIf { it.index < devices.size }
+                                            ?.takeIf { it.index < viewModel.devices.size }
                                             ?.let { target ->
                                                 draggingOffset += if (target.index > draggedItemIndex) {
                                                     currentItem.offset - target.offset - target.size + currentItem.size
                                                 } else {
                                                     currentItem.offset - target.offset
                                                 }
-                                                devices.add(
+                                                viewModel.devices.add(
                                                     target.index,
-                                                    devices.removeAt(draggedItemIndex)
+                                                    viewModel.devices.removeAt(draggedItemIndex)
                                                 )
                                                 draggedItemIndex = target.index
                                             }
                                     }
                                 },
                                 onDragEnd = {
-                                    onReorder(); draggedItemIndex = -1; draggingOffset = 0f
+                                    viewModel.saveDevices(); draggedItemIndex = -1; draggingOffset =
+                                    0f
                                 },
                                 onDragCancel = {
-                                    onReorder(); draggedItemIndex = -1; draggingOffset = 0f
+                                    viewModel.saveDevices(); draggedItemIndex = -1; draggingOffset =
+                                    0f
                                 }
                             )
                         }
                 ) {
-                    itemsIndexed(devices, key = { _, d -> d.id }) { index, device ->
+                    itemsIndexed(viewModel.devices, key = { _, d -> d.id }) { index, device ->
                         val isDragging = index == draggedItemIndex
                         DeviceStatusItem(
                             device = device,
-                            isOn = deviceStatuses[device.id],
-                            isMonitoring = isMonitoring,
-                            onClick = { onEditDevice(device) },
+                            isOn = viewModel.deviceStatuses[device.id],
+                            isMonitoring = viewModel.isMonitoring,
+                            onClick = { viewModel.startEditing(device) },
                             modifier = Modifier
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .graphicsLayer {
@@ -240,7 +217,7 @@ fun DeviceMonitorScreen(
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    if (isMonitoring) onToggleMonitoring(false)
+                    if (viewModel.isMonitoring) viewModel.toggleMonitoring(false)
                     else {
                         val hasPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             ContextCompat.checkSelfPermission(
@@ -248,12 +225,12 @@ fun DeviceMonitorScreen(
                                 Manifest.permission.POST_NOTIFICATIONS
                             ) == PackageManager.PERMISSION_GRANTED
                         } else true
-                        if (hasPerm) onToggleMonitoring(true)
+                        if (hasPerm) viewModel.toggleMonitoring(true)
                         else permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                 }
             ) {
-                Text(if (isMonitoring) "Stop Monitoring" else "Start Monitoring")
+                Text(if (viewModel.isMonitoring) "Stop Monitoring" else "Start Monitoring")
             }
         }
     }
@@ -272,6 +249,7 @@ private fun EmptyState() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeviceStatusItem(
     device: Device,
@@ -322,32 +300,18 @@ fun DeviceStatusItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditDeviceScreen(
-    device: Device?,
-    devices: SnapshotStateList<Device>,
-    onBack: () -> Unit
+    viewModel: DeviceViewModel
 ) {
+    val device = viewModel.editingDevice
     val focusManager = LocalFocusManager.current
     var name by remember { mutableStateOf(device?.name ?: "") }
     var ip by remember { mutableStateOf(device?.ip ?: Device.DEFAULT_IP) }
     var isEnabled by remember { mutableStateOf(device?.isEnabled ?: true) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
-    val isNameError = name.isBlank()
-    val isIpError = ip.isBlank() || ip.contains(" ")
-    val isFormValid = !isNameError && !isIpError
+    val isFormValid = name.isNotBlank() && ip.isNotBlank() && !ip.contains(" ")
 
-    fun handleSave() {
-        if (!isFormValid) return
-        if (device == null) devices.add(Device(UUID.randomUUID().toString(), name, ip, isEnabled))
-        else {
-            val index = devices.indexOfFirst { it.id == device.id }
-            if (index != -1) devices[index] =
-                device.copy(name = name, ip = ip, isEnabled = isEnabled)
-        }
-        onBack()
-    }
-
-    BackHandler(onBack = onBack)
+    BackHandler(onBack = { viewModel.cancelEdit() })
 
     if (showDeleteConfirmation) {
         AlertDialog(
@@ -356,16 +320,14 @@ fun AddEditDeviceScreen(
             text = { Text("Are you sure?") },
             confirmButton = {
                 TextButton(onClick = {
-                    devices.removeAll { it.id == device?.id }
-                    onBack()
-                }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
+                    viewModel.devices.removeAll { it.id == device?.id }
+                    viewModel.cancelEdit()
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text("Cancel")
-                } 
+                TextButton(onClick = {
+                    showDeleteConfirmation = false
+                }) { Text("Cancel") }
             }
         )
     }
@@ -375,7 +337,7 @@ fun AddEditDeviceScreen(
             TopAppBar(
                 title = { Text(if (device == null) "Add Device" else "Edit Device") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { viewModel.cancelEdit() }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             null
@@ -383,12 +345,19 @@ fun AddEditDeviceScreen(
                     }
                 },
                 actions = {
-                    if (isFormValid) IconButton(onClick = { handleSave() }) {
-                        Icon(
-                            Icons.Default.Check,
-                            null
+                    if (isFormValid) IconButton(onClick = {
+                        if (device == null) viewModel.devices.add(
+                            Device(
+                                UUID.randomUUID().toString(), name, ip, isEnabled
+                            )
                         )
-                    }
+                        else {
+                            val index = viewModel.devices.indexOfFirst { it.id == device.id }
+                            if (index != -1) viewModel.devices[index] =
+                                device.copy(name = name, ip = ip, isEnabled = isEnabled)
+                        }
+                        viewModel.cancelEdit()
+                    }) { Icon(Icons.Default.Check, null) }
                 }
             )
         }
@@ -403,7 +372,8 @@ fun AddEditDeviceScreen(
             TextField(
                 value = name, onValueChange = { name = it },
                 label = { Text("Device Name") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true, isError = isNameError,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
@@ -411,12 +381,12 @@ fun AddEditDeviceScreen(
                 value = ip, onValueChange = { ip = it },
                 label = { Text("IP Address / Hostname") },
                 placeholder = { Text("e.g. ${Device.DEFAULT_IP}") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true, isError = isIpError,
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); handleSave() })
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); /* handleSave logic is in action */ })
             )
             Card(
                 modifier = Modifier.fillMaxWidth(),

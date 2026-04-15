@@ -22,6 +22,20 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     var editingDevice by mutableStateOf<Device?>(null)
     var isAdding by mutableStateOf(false)
 
+    fun startAdding() {
+        isAdding = true
+    }
+
+    fun startEditing(device: Device) {
+        editingDevice = device
+    }
+
+    fun cancelEdit() {
+        isAdding = false
+        editingDevice = null
+        saveDevices()
+    }
+
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
