@@ -258,14 +258,35 @@ fun DeviceStatusItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isEnabled = device.isEnabled
+    val statusText = when {
+        !isEnabled -> "DISABLED"
+        !isMonitoring -> "???"
+        isOn == true -> "ON"
+        isOn == false -> "OFF"
+        else -> "???"
+    }
+
+    val statusColor = when {
+        !isEnabled -> Color.Gray
+        isMonitoring && isOn == true -> Color.Green
+        isMonitoring && isOn == false -> Color.Red
+        else -> Color.Gray
+    }
+
+    val contentAlpha = if (isEnabled) 1f else 0.5f
+    val containerColor = if (isEnabled) {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    }
+
     Card(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        colors = if (device.isEnabled) CardDefaults.cardColors() else CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -276,21 +297,20 @@ fun DeviceStatusItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                val color = if (device.isEnabled) Color.Unspecified else Color.Gray
                 Text(
                     text = device.name,
                     style = MaterialTheme.typography.titleMedium,
-                    color = color
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
                 )
-                Text(text = device.ip, style = MaterialTheme.typography.bodySmall, color = color)
+                Text(
+                    text = device.ip,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha)
+                )
             }
             Text(
-                text = if (!device.isEnabled) "DISABLED" else if (!isMonitoring) "???" else when (isOn) {
-                    true -> "ON"
-                    false -> "OFF"
-                    else -> "???"
-                },
-                color = if (!device.isEnabled) Color.Gray else if (isMonitoring && isOn == true) Color.Green else if (isMonitoring && isOn == false) Color.Red else Color.Gray,
+                text = statusText,
+                color = statusColor,
                 style = MaterialTheme.typography.headlineSmall
             )
         }
