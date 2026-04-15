@@ -105,25 +105,27 @@ private fun isServiceRunning(context: Context): Boolean {
 
 @Composable
 fun MainNavigation(viewModel: DeviceViewModel) {
+    val onBack = {
+        viewModel.isAdding = false
+        viewModel.editingDevice = null
+        viewModel.saveDevices()
+    }
+
     if (viewModel.isAdding || viewModel.editingDevice != null) {
         AddEditDeviceScreen(
             device = viewModel.editingDevice,
             devices = viewModel.devices,
-            onBack = {
-                viewModel.isAdding = false
-                viewModel.editingDevice = null
-                viewModel.saveDevices()
-            }
+            onBack = onBack
         )
     } else {
         DeviceMonitorScreen(
             devices = viewModel.devices,
             deviceStatuses = viewModel.deviceStatuses,
             isMonitoring = viewModel.isMonitoring,
-            onToggleMonitoring = { viewModel.toggleMonitoring(it) },
+            onToggleMonitoring = viewModel::toggleMonitoring,
             onAddDevice = { viewModel.isAdding = true },
             onEditDevice = { viewModel.editingDevice = it },
-            onReorder = { viewModel.saveDevices() }
+            onReorder = viewModel::saveDevices
         )
     }
 }
@@ -167,18 +169,7 @@ fun DeviceMonitorScreen(
                 .padding(16.dp)
         ) {
             if (devices.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "No devices added yet.\nTap '+' to add one.",
-                        textAlign = TextAlign.Center,
-                        color = Color.Gray
-                    )
-                }
+                EmptyState()
             } else {
                 LazyColumn(
                     state = lazyListState,
@@ -265,6 +256,19 @@ fun DeviceMonitorScreen(
                 Text(if (isMonitoring) "Stop Monitoring" else "Start Monitoring")
             }
         }
+    }
+}
+
+@Composable
+private fun EmptyState() {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp), contentAlignment = Alignment.Center) {
+        Text(
+            "No devices added yet.\nTap '+' to add one.",
+            textAlign = TextAlign.Center,
+            color = Color.Gray
+        )
     }
 }
 
