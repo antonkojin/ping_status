@@ -133,9 +133,20 @@ class MonitorService : Service() {
         val intent = { action: String? ->
             val i = if (action == null) Intent(this, MainActivity::class.java)
             else Intent(this, MonitorService::class.java).apply { this.action = action }
-            val flag = PendingIntent.FLAG_IMMUTABLE
+            val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_IMMUTABLE or (if (action == null) 0 else PendingIntent.FLAG_UPDATE_CURRENT)
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
             if (action == null) PendingIntent.getActivity(this, 0, i, flag)
-            else PendingIntent.getService(this, 1, i, flag)
+            else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && action == ACTION_STOP_SERVICE) {
+                    // On newer versions, we might need different handling if we want to ensure it stops
+                    PendingIntent.getService(this, 1, i, flag)
+                } else {
+                    PendingIntent.getService(this, 1, i, flag)
+                }
+            }
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
