@@ -347,19 +347,23 @@ fun DeviceStatusItem(
 ) {
     val statusText = when {
         !device.isEnabled -> "DISABLED"
-        !isMonitoring -> "???"
+        !isMonitoring -> "STOPPED"
         isOn == true -> "ON"
         isOn == false -> "OFF"
-        else -> "???"
+        else -> "PENDING..."
     }
     val statusColor = when {
         !device.isEnabled -> Color.Gray
-        isMonitoring && isOn == true -> Color.Green
-        isMonitoring && isOn == false -> Color.Red
-        else -> Color.Gray
+        !isMonitoring -> MaterialTheme.colorScheme.outline
+        isOn == true -> Color(0xFF4CAF50) // Material Green
+        isOn == false -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
     }
-    val containerColor =
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (device.isEnabled) 0.8f else 0.3f)
+    val containerColor = if (device.isEnabled) {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+    }
 
     Card(
         onClick = onClick, modifier = modifier

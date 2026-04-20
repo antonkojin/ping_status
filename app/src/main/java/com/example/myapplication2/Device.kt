@@ -31,60 +31,48 @@ data class Device(
 }
 
 object DeviceStore {
-    private const val PREFS_NAME = "device_monitor_prefs"
+    private const val PREFS = "monitor_prefs"
     private const val KEY_DEVICES = "devices"
-    private const val KEY_INTERVAL = "ping_interval"
+    private const val KEY_INTERVAL = "interval"
     private const val DEFAULT_INTERVAL = 5000L
 
-    private fun getPrefs(context: Context) =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun saveDevices(context: Context, devices: List<Device>) {
-        val array = JSONArray().apply { devices.forEach { put(it.toJsonObject()) } }
-        getPrefs(context).edit { putString(KEY_DEVICES, array.toString()) }
+        val array = JSONArray()
+        devices.forEach { array.put(it.toJsonObject()) }
+        prefs(context).edit { putString(KEY_DEVICES, array.toString()) }
     }
 
     fun loadDevices(context: Context): List<Device> {
-        val json = getPrefs(context).getString(KEY_DEVICES, null) ?: return emptyList()
+        val json = prefs(context).getString(KEY_DEVICES, null) ?: return emptyList()
         return try {
             val array = JSONArray(json)
-            List(array.length()) { i -> Device.fromJsonObject(array.getJSONObject(i)) }
+            (0 until array.length()).map { Device.fromJsonObject(array.getJSONObject(it)) }
         } catch (_: Exception) {
             emptyList()
         }
     }
 
-    fun saveInterval(context: Context, intervalMs: Long) =
-        getPrefs(context).edit { putLong(KEY_INTERVAL, intervalMs) }
+    fun saveInterval(context: Context, ms: Long) = prefs(context).edit { putLong(KEY_INTERVAL, ms) }
+    fun loadInterval(context: Context) = prefs(context).getLong(KEY_INTERVAL, DEFAULT_INTERVAL)
 
-    fun loadInterval(context: Context) =
-        getPrefs(context).getLong(KEY_INTERVAL, DEFAULT_INTERVAL)
+    fun exportConfig(context: Context) = JSONObject().apply {
+        put(
+            "devices",
+            JSONArray().apply { loadDevices(context).forEach { put(it.toJsonObject()) } })
+        put("interval", loadInterval(context))
+    }.toString(4)
 
-    fun exportConfig(context: Context): String {
-        val obj = JSONObject().apply {
-            val devicesArray =
-                JSONArray().apply { loadDevices(context).forEach { put(it.toJsonObject()) } }
-            put("devices", devicesArray)
-            put("interval", loadInterval(context))
-        }
-        return obj.toString(4)
-    }
-
-    fun importConfig(context: Context, json: String): Boolean {
-        return try {
-            val obj = JSONObject(json)
-            val devicesArray = obj.getJSONArray("devices")
-            val devices = List(devicesArray.length()) { i ->
-                Device.fromJsonObject(
-                    devicesArray.getJSONObject(i)
-                )
-            }
-            val interval = obj.optLong("interval", DEFAULT_INTERVAL)
-            saveDevices(context, devices)
-            saveInterval(context, interval)
-            true
-        } catch (_: Exception) {
-            false
-        }
+    fun importConfig(context: Context, json: String) = try {
+        val obj = JSONObject(json)
+        val devices = mutableListOf<Device>()
+        val array = obj.getJSONArray("devices")
+        for (i in 0 until array.length()) devices.add(Device.fromJsonObject(array.getJSONObject(i)))
+        saveDevices(context, devices)
+        saveInterval(context, obj.optLong("interval", DEFAULT_INTERVAL))
+        true
+    } catch (_: Exception) {
+        false
     }
 }
