@@ -35,7 +35,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -213,7 +213,7 @@ fun DeviceMonitorScreen(viewModel: DeviceViewModel) {
                     }
                     IconButton(onClick = {
                         showIntervalDialog = true
-                    }) { Icon(Icons.Default.Settings, "Settings") }
+                    }) { Icon(Icons.Default.Timer, "Settings") }
                     IconButton(onClick = { viewModel.startAdding() }) {
                         Icon(
                             Icons.Default.Add,
