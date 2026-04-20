@@ -2,8 +2,6 @@ package com.example.myapplication2
 
 import android.Manifest
 import android.app.ActivityManager
-import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -52,6 +50,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -82,51 +81,42 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val viewModel: DeviceViewModel = viewModel()
-
-            val isRunning = isServiceRunning(this)
-            viewModel.setMonitoringState(isRunning)
-            if (isRunning) {
-                startService(Intent(this, MonitorService::class.java))
+            LaunchedEffect(Unit) {
+                if (isServiceRunning()) viewModel.setMonitoringState(true)
             }
-
-            MyApplication2Theme {
-                MainNavigation(viewModel)
-            }
+            MyApplication2Theme { MainNavigation(viewModel) }
         }
     }
-}
 
-private fun isServiceRunning(context: Context): Boolean {
-    val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-    @Suppress("DEPRECATION")
-    return manager.getRunningServices(Int.MAX_VALUE).any {
-        it.service.className == MonitorService::class.java.name
+    private fun isServiceRunning(): Boolean {
+        val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        @Suppress("DEPRECATION")
+        return manager.getRunningServices(Int.MAX_VALUE)
+            .any { it.service.className == MonitorService::class.java.name }
     }
 }
 
 @Composable
 fun MainNavigation(viewModel: DeviceViewModel) {
-    if (viewModel.isAdding || viewModel.editingDevice != null) {
-        AddEditDeviceScreen(viewModel = viewModel)
-    } else {
-        DeviceMonitorScreen(viewModel = viewModel)
+    when {
+        viewModel.isAdding || viewModel.editingDevice != null -> AddEditDeviceScreen(viewModel)
+        else -> DeviceMonitorScreen(viewModel)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeviceMonitorScreen(
-    viewModel: DeviceViewModel
-) {
+fun DeviceMonitorScreen(viewModel: DeviceViewModel) {
     val context = LocalContext.current
     val lazyListState = rememberLazyListState()
     var draggedItemIndex by remember { mutableIntStateOf(-1) }
     var draggingOffset by remember { mutableFloatStateOf(0f) }
     var showIntervalDialog by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { if (it) viewModel.toggleMonitoring(true) }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            if (it) viewModel.toggleMonitoring(true)
+        }
 
     if (showIntervalDialog) {
         var tempInterval by remember { mutableStateOf((viewModel.pingIntervalMs / 1000).toString()) }
@@ -136,21 +126,21 @@ fun DeviceMonitorScreen(
             text = {
                 TextField(
                     value = tempInterval,
-                    onValueChange = { if (it.all { char -> char.isDigit() }) tempInterval = it },
+                    onValueChange = { if (it.all { c -> c.isDigit() }) tempInterval = it },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val seconds = tempInterval.toLongOrNull() ?: 5L
-                    viewModel.updatePingInterval(seconds * 1000L)
+                    viewModel.updatePingInterval((tempInterval.toLongOrNull() ?: 5L) * 1000L)
                     showIntervalDialog = false
                 }) { Text("Save") }
             },
             dismissButton = {
-                TextButton(onClick = { showIntervalDialog = false }) { Text("Cancel") }
+                TextButton(onClick = {
+                    showIntervalDialog = false
+                }) { Text("Cancel") }
             }
         )
     }
@@ -160,29 +150,36 @@ fun DeviceMonitorScreen(
             TopAppBar(
                 title = { Text("PingStatus") },
                 actions = {
-                    IconButton(onClick = { showIntervalDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
+                    IconButton(onClick = {
+                        showIntervalDialog = true
+                    }) { Icon(Icons.Default.Settings, "Settings") }
                     IconButton(onClick = { viewModel.startAdding() }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add")
+                        Icon(
+                            Icons.Default.Add,
+                            "Add"
+                        )
                     }
                 }
             )
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
+    ) { padding ->
+        Column(modifier = Modifier
+            .padding(padding)
+            .fillMaxSize()
+            .padding(16.dp)) {
             PullToRefreshBox(
                 isRefreshing = viewModel.isRefreshing,
                 onRefresh = { viewModel.refresh() },
                 modifier = Modifier.weight(1f)
             ) {
                 if (viewModel.devices.isEmpty()) {
-                    EmptyState()
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "No devices added yet.\nTap '+' to add one.",
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
+                        )
+                    }
                 } else {
                     LazyColumn(
                         state = lazyListState,
@@ -199,27 +196,22 @@ fun DeviceMonitorScreen(
                                     onDrag = { change, dragAmount ->
                                         change.consume()
                                         draggingOffset += dragAmount.y
-                                        val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-                                        val currentItem =
-                                            visibleItems.firstOrNull { it.index == draggedItemIndex }
-                                        if (currentItem != null) {
-                                            val currentCenter =
-                                                currentItem.offset + currentItem.size / 2 + draggingOffset
-                                            visibleItems.firstOrNull { it.index != draggedItemIndex && currentCenter.toInt() in it.offset..(it.offset + it.size) }
-                                                ?.takeIf { it.index < viewModel.devices.size }
-                                                ?.let { target ->
-                                                    draggingOffset += if (target.index > draggedItemIndex) {
-                                                        currentItem.offset - target.offset - target.size + currentItem.size
-                                                    } else {
-                                                        currentItem.offset - target.offset
-                                                    }
-                                                    viewModel.devices.add(
-                                                        target.index,
-                                                        viewModel.devices.removeAt(draggedItemIndex)
-                                                    )
-                                                    draggedItemIndex = target.index
-                                                }
-                                        }
+                                        val items = lazyListState.layoutInfo.visibleItemsInfo
+                                        val current =
+                                            items.firstOrNull { it.index == draggedItemIndex }
+                                                ?: return@detectDragGesturesAfterLongPress
+                                        val center =
+                                            current.offset + current.size / 2 + draggingOffset
+                                        items.firstOrNull { it.index != draggedItemIndex && center.toInt() in it.offset..(it.offset + it.size) }
+                                            ?.takeIf { it.index < viewModel.devices.size }
+                                            ?.let { target ->
+                                                draggingOffset += if (target.index > draggedItemIndex) current.offset - target.offset - target.size + current.size else current.offset - target.offset
+                                                viewModel.devices.add(
+                                                    target.index,
+                                                    viewModel.devices.removeAt(draggedItemIndex)
+                                                )
+                                                draggedItemIndex = target.index
+                                            }
                                     },
                                     onDragEnd = {
                                         viewModel.saveDevices(); draggedItemIndex =
@@ -252,9 +244,7 @@ fun DeviceMonitorScreen(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
+            Spacer(Modifier.height(16.dp))
             OutlinedButton(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -268,30 +258,20 @@ fun DeviceMonitorScreen(
                                 Manifest.permission.POST_NOTIFICATIONS
                             ) == PackageManager.PERMISSION_GRANTED
                         } else true
-                        if (hasPerm) viewModel.toggleMonitoring(true)
-                        else permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        if (hasPerm) viewModel.toggleMonitoring(true) else {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
                     }
                 }
             ) {
                 Text(
-                    text = if (viewModel.isMonitoring) "Stop Monitoring" else "Start Monitoring",
-                    style = MaterialTheme.typography.titleMedium,
+                    if (viewModel.isMonitoring) "Stop Monitoring" else "Start Monitoring",
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyState() {
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp), contentAlignment = Alignment.Center) {
-        Text(
-            "No devices added yet.\nTap '+' to add one.",
-            textAlign = TextAlign.Center,
-            color = Color.Gray
-        )
     }
 }
 
@@ -304,97 +284,79 @@ fun DeviceStatusItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isEnabled = device.isEnabled
     val statusText = when {
-        !isEnabled -> "DISABLED"
+        !device.isEnabled -> "DISABLED"
         !isMonitoring -> "???"
         isOn == true -> "ON"
         isOn == false -> "OFF"
         else -> "???"
     }
-
     val statusColor = when {
-        !isEnabled -> Color.Gray
+        !device.isEnabled -> Color.Gray
         isMonitoring && isOn == true -> Color.Green
         isMonitoring && isOn == false -> Color.Red
         else -> Color.Gray
     }
-
-    val contentAlpha = if (isEnabled) 1f else 0.5f
-    val containerColor = if (isEnabled) {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-    }
+    val containerColor =
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (device.isEnabled) 0.8f else 0.3f)
 
     Card(
-        onClick = onClick,
-        modifier = modifier
+        onClick = onClick, modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .padding(12.dp, 12.dp)
+            Modifier
+                .padding(12.dp)
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            Arrangement.SpaceBetween,
+            Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    text = device.name,
+                    device.name,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+                    color = MaterialTheme.colorScheme.onSurface.copy(if (device.isEnabled) 1f else 0.5f)
                 )
                 Text(
-                    text = device.ip,
+                    device.ip,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(if (device.isEnabled) 1f else 0.5f)
                 )
             }
-            Text(
-                text = statusText,
-                color = statusColor,
-                style = MaterialTheme.typography.headlineSmall
-            )
+            Text(statusText, color = statusColor, style = MaterialTheme.typography.headlineSmall)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEditDeviceScreen(
-    viewModel: DeviceViewModel
-) {
+fun AddEditDeviceScreen(viewModel: DeviceViewModel) {
     val device = viewModel.editingDevice
     val focusManager = LocalFocusManager.current
     var name by remember { mutableStateOf(device?.name ?: "") }
     var ip by remember { mutableStateOf(device?.ip ?: Device.DEFAULT_IP) }
     var isEnabled by remember { mutableStateOf(device?.isEnabled ?: true) }
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showDelete by remember { mutableStateOf(false) }
 
-    val isFormValid = name.isNotBlank() && ip.isNotBlank() && !ip.contains(" ")
+    BackHandler { viewModel.cancelEdit() }
 
-    BackHandler(onBack = { viewModel.cancelEdit() })
-
-    if (showDeleteConfirmation) {
+    if (showDelete) {
         AlertDialog(
-            onDismissRequest = { showDeleteConfirmation = false },
+            onDismissRequest = { showDelete = false },
             title = { Text("Delete Device") },
             text = { Text("Are you sure?") },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.devices.removeAll { it.id == device?.id }
-                    viewModel.cancelEdit()
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { viewModel.devices.removeAll { it.id == device?.id }; viewModel.cancelEdit() }) {
+                    Text(
+                        "Delete",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             },
-            dismissButton = {
-                TextButton(onClick = {
-                    showDeleteConfirmation = false
-                }) { Text("Cancel") }
-            }
+            dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } }
         )
     }
 
@@ -411,32 +373,35 @@ fun AddEditDeviceScreen(
                     }
                 },
                 actions = {
-                    if (isFormValid) IconButton(onClick = {
-                        if (device == null) viewModel.devices.add(
-                            Device(
-                                UUID.randomUUID().toString(), name, ip, isEnabled
+                    if (name.isNotBlank() && ip.isNotBlank() && !ip.contains(" ")) {
+                        IconButton(onClick = {
+                            if (device == null) viewModel.devices.add(
+                                Device(
+                                    UUID.randomUUID().toString(), name, ip, isEnabled
+                                )
                             )
-                        )
-                        else {
-                            val index = viewModel.devices.indexOfFirst { it.id == device.id }
-                            if (index != -1) viewModel.devices[index] =
-                                device.copy(name = name, ip = ip, isEnabled = isEnabled)
-                        }
-                        viewModel.cancelEdit()
-                    }) { Icon(Icons.Default.Check, null) }
+                            else {
+                                val idx = viewModel.devices.indexOfFirst { it.id == device.id }
+                                if (idx != -1) viewModel.devices[idx] =
+                                    device.copy(name = name, ip = ip, isEnabled = isEnabled)
+                            }
+                            viewModel.cancelEdit()
+                        }) { Icon(Icons.Default.Check, null) }
+                    }
                 }
             )
         }
-    ) { innerPadding ->
+    ) { padding ->
         Column(
-            modifier = Modifier
-                .padding(innerPadding)
+            Modifier
+                .padding(padding)
                 .fillMaxSize()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             TextField(
-                value = name, onValueChange = { name = it },
+                name,
+                { name = it },
                 label = { Text("Device Name") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -444,48 +409,49 @@ fun AddEditDeviceScreen(
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
             TextField(
-                value = ip, onValueChange = { ip = it },
+                ip,
+                { ip = it },
                 label = { Text("IP Address / Hostname") },
                 placeholder = { Text("e.g. ${Device.DEFAULT_IP}") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); /* handleSave logic is in action */ })
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
             )
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                )
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant.copy(0.3f))
             ) {
                 Row(
                     modifier = Modifier
                         .padding(16.dp, 0.dp)
                         .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Enable Monitoring", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = isEnabled, onCheckedChange = { isEnabled = it })
+                    Switch(isEnabled, { isEnabled = it })
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
             if (device != null) {
                 OutlinedButton(
-                    onClick = { showDeleteConfirmation = true },
-                    modifier = Modifier
+                    { showDelete = true },
+                    Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Icon(Icons.Default.Delete, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Delete Device",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Icon(
+                        Icons.Default.Delete,
+                        null
+                    ); Spacer(Modifier.width(8.dp)); Text(
+                    "Delete Device",
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 }
             }
         }
