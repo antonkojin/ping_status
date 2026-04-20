@@ -33,6 +33,8 @@ data class Device(
 object DeviceStore {
     private const val PREFS_NAME = "device_monitor_prefs"
     private const val KEY_DEVICES = "devices"
+    private const val KEY_INTERVAL = "ping_interval"
+    private const val DEFAULT_INTERVAL = 5000L
 
     fun saveDevices(context: Context, devices: List<Device>) {
         val array = JSONArray()
@@ -52,5 +54,15 @@ object DeviceStore {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    fun saveInterval(context: Context, intervalMs: Long) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit { putLong(KEY_INTERVAL, intervalMs) }
+    }
+
+    fun loadInterval(context: Context): Long {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getLong(KEY_INTERVAL, DEFAULT_INTERVAL)
     }
 }

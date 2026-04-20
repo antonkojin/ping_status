@@ -91,7 +91,8 @@ class MonitorService : Service() {
                 } catch (e: Exception) {
                     Log.e("MonitorService", "Error in monitoring loop", e)
                 }
-                delay(5000)
+                val interval = DeviceStore.loadInterval(this@MonitorService)
+                delay(interval)
             }
         }
     }

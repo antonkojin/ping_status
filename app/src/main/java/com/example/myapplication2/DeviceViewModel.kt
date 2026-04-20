@@ -21,6 +21,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     var editingDevice by mutableStateOf<Device?>(null)
     var isAdding by mutableStateOf(false)
+    var pingIntervalMs by mutableStateOf(5000L)
+        private set
 
     fun startAdding() {
         isAdding = true
@@ -54,6 +56,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         loadDevices()
+        pingIntervalMs = DeviceStore.loadInterval(application)
         val filter = IntentFilter().apply {
             addAction(MonitorService.ACTION_STATUS_CHANGED)
             addAction(MonitorService.ACTION_MONITOR_STOPPED)
@@ -89,6 +92,16 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setMonitoringState(running: Boolean) {
         isMonitoring = running
+    }
+
+    fun updatePingInterval(intervalMs: Long) {
+        pingIntervalMs = intervalMs
+        DeviceStore.saveInterval(getApplication(), intervalMs)
+        // Restart service if running to apply new interval immediately
+        if (isMonitoring) {
+            toggleMonitoring(false)
+            toggleMonitoring(true)
+        }
     }
 
     override fun onCleared() {

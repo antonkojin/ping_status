@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -120,16 +121,47 @@ fun DeviceMonitorScreen(
     val lazyListState = rememberLazyListState()
     var draggedItemIndex by remember { mutableIntStateOf(-1) }
     var draggingOffset by remember { mutableFloatStateOf(0f) }
+    var showIntervalDialog by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { if (it) viewModel.toggleMonitoring(true) }
+
+    if (showIntervalDialog) {
+        var tempInterval by remember { mutableStateOf((viewModel.pingIntervalMs / 1000).toString()) }
+        AlertDialog(
+            onDismissRequest = { showIntervalDialog = false },
+            title = { Text("Ping Interval (seconds)") },
+            text = {
+                TextField(
+                    value = tempInterval,
+                    onValueChange = { if (it.all { char -> char.isDigit() }) tempInterval = it },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val seconds = tempInterval.toLongOrNull() ?: 5L
+                    viewModel.updatePingInterval(seconds * 1000L)
+                    showIntervalDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showIntervalDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("PingStatus") },
                 actions = {
+                    IconButton(onClick = { showIntervalDialog = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
                     IconButton(onClick = { viewModel.startAdding() }) {
                         Icon(Icons.Default.Add, contentDescription = "Add")
                     }
@@ -217,7 +249,7 @@ fun DeviceMonitorScreen(
             OutlinedButton(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(56.dp),
                 onClick = {
                     if (viewModel.isMonitoring) viewModel.toggleMonitoring(false)
                     else {
@@ -436,7 +468,7 @@ fun AddEditDeviceScreen(
                     onClick = { showDeleteConfirmation = true },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(56.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
                     Icon(Icons.Default.Delete, null)
