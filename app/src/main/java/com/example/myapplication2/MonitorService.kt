@@ -28,6 +28,8 @@ class MonitorService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var monitoringJob: Job? = null
     private val pingDispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
+    private var lastSummary: String? = null
+    private var lastDetails: String? = null
 
     companion object {
         const val CHANNEL_ID = "DeviceMonitorChannel"
@@ -120,12 +122,15 @@ class MonitorService : Service() {
         deviceStatuses.forEach { (id, status) -> broadcastStatus(id, status) }
 
     private fun updateNotification(devices: List<Device>) {
-        val onCount = devices.count { deviceStatuses[it.id] == true }
-        val offCount = devices.count { deviceStatuses[it.id] == false }
-        val summary = if (devices.isEmpty()) "No active devices" else "$onCount ON, $offCount OFF"
         val details = if (devices.isEmpty()) null else devices.joinToString("\n") {
             "${it.name}: ${if (deviceStatuses[it.id] == true) "ON" else "OFF"}" 
         }
+        val summary = details ?: "No active devices"
+
+        if (summary == lastSummary && details == lastDetails) return
+        lastSummary = summary
+        lastDetails = details
+
         notificationManager.notify(
             NOTIFICATION_ID,
             createNotification(summary, details)
@@ -151,8 +156,9 @@ class MonitorService : Service() {
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(intent(null))
-//            .setPriority(NotificationCompat.PRIORITY_HIGH)
-//            .setSilent(false)
+//            .setPriority(NotificationCompat.PRIORITY_LOW)
+//            .setSilent(true)
+//            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .addAction(0, "Refresh", intent(ACTION_REFRESH))
             .addAction(0, "Stop Monitoring", intent(ACTION_STOP_SERVICE))
