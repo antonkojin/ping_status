@@ -11,7 +11,7 @@ data class Device(
     val ip: String,
     val isEnabled: Boolean = true
 ) {
-    fun toJsonObject(): JSONObject = JSONObject().apply {
+    fun toJsonObject() = JSONObject().apply {
         put("id", id)
         put("name", name)
         put("ip", ip)
@@ -21,7 +21,7 @@ data class Device(
     companion object {
         const val DEFAULT_IP = "192.168.1.1"
 
-        fun fromJsonObject(obj: JSONObject): Device = Device(
+        fun fromJsonObject(obj: JSONObject) = Device(
             id = obj.getString("id"),
             name = obj.getString("name"),
             ip = obj.getString("ip"),
@@ -36,33 +36,27 @@ object DeviceStore {
     private const val KEY_INTERVAL = "ping_interval"
     private const val DEFAULT_INTERVAL = 5000L
 
-    fun saveDevices(context: Context, devices: List<Device>) {
-        val array = JSONArray()
-        devices.forEach { array.put(it.toJsonObject()) }
+    private fun getPrefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit { putString(KEY_DEVICES, array.toString()) }
+
+    fun saveDevices(context: Context, devices: List<Device>) {
+        val array = JSONArray().apply { devices.forEach { put(it.toJsonObject()) } }
+        getPrefs(context).edit { putString(KEY_DEVICES, array.toString()) }
     }
 
     fun loadDevices(context: Context): List<Device> {
-        val json = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_DEVICES, null) ?: return emptyList()
+        val json = getPrefs(context).getString(KEY_DEVICES, null) ?: return emptyList()
         return try {
             val array = JSONArray(json)
-            List(array.length()) { i ->
-                Device.fromJsonObject(array.getJSONObject(i))
-            }
-        } catch (e: Exception) {
+            List(array.length()) { i -> Device.fromJsonObject(array.getJSONObject(i)) }
+        } catch (_: Exception) {
             emptyList()
         }
     }
 
-    fun saveInterval(context: Context, intervalMs: Long) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit { putLong(KEY_INTERVAL, intervalMs) }
-    }
+    fun saveInterval(context: Context, intervalMs: Long) =
+        getPrefs(context).edit { putLong(KEY_INTERVAL, intervalMs) }
 
-    fun loadInterval(context: Context): Long {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getLong(KEY_INTERVAL, DEFAULT_INTERVAL)
-    }
+    fun loadInterval(context: Context) =
+        getPrefs(context).getLong(KEY_INTERVAL, DEFAULT_INTERVAL)
 }

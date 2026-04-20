@@ -14,10 +14,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class DeviceViewModel(application: Application) : AndroidViewModel(application) {
     val devices = mutableStateListOf<Device>()
     val deviceStatuses = mutableStateMapOf<String, Boolean>()
+
     var isMonitoring by mutableStateOf(false)
         private set
 
@@ -27,19 +31,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     var pingIntervalMs by mutableLongStateOf(5000L)
         private set
 
-    fun startAdding() {
-        isAdding = true
-    }
-
-    fun startEditing(device: Device) {
-        editingDevice = device
-    }
-
-    fun cancelEdit() {
-        isAdding = false
-        editingDevice = null
-        saveDevices()
-    }
+    private fun getContext() = getApplication<Application>()
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -49,10 +41,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     val status = intent.getBooleanExtra(MonitorService.EXTRA_STATUS, false)
                     deviceStatuses[id] = status
                 }
-
-                MonitorService.ACTION_MONITOR_STOPPED -> {
-                    isMonitoring = false
-                }
+                MonitorService.ACTION_MONITOR_STOPPED -> isMonitoring = false
             }
         }
     }
@@ -74,23 +63,33 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun loadDevices() {
         devices.clear()
-        devices.addAll(DeviceStore.loadDevices(getApplication()))
+        devices.addAll(DeviceStore.loadDevices(getContext()))
     }
 
-    fun saveDevices() {
-        DeviceStore.saveDevices(getApplication(), devices)
+    fun saveDevices() = DeviceStore.saveDevices(getContext(), devices)
+
+    fun startAdding() {
+        isAdding = true
+    }
+
+    fun startEditing(device: Device) {
+        editingDevice = device
+    }
+
+    fun cancelEdit() {
+        isAdding = false
+        editingDevice = null
+        saveDevices()
     }
 
     fun toggleMonitoring(shouldStart: Boolean) {
-        val context = getApplication<Application>()
+        val intent = Intent(getContext(), MonitorService::class.java)
         if (shouldStart) {
-            val intent = Intent(context, MonitorService::class.java)
-            ContextCompat.startForegroundService(context, intent)
-            isMonitoring = true
+            ContextCompat.startForegroundService(getContext(), intent)
         } else {
-            context.stopService(Intent(context, MonitorService::class.java))
-            isMonitoring = false
+            getContext().stopService(intent)
         }
+        isMonitoring = shouldStart
     }
 
     fun setMonitoringState(running: Boolean) {
@@ -99,28 +98,28 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updatePingInterval(intervalMs: Long) {
         pingIntervalMs = intervalMs
-        DeviceStore.saveInterval(getApplication(), intervalMs)
+        DeviceStore.saveInterval(getContext(), intervalMs)
     }
 
     fun refresh() {
         if (!isMonitoring) {
-            Toast.makeText(getApplication(), "Monitoring not enabled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(getContext(), "Monitoring not enabled", Toast.LENGTH_SHORT).show()
             return
         }
-        val context = getApplication<Application>()
-        val intent = Intent(context, MonitorService::class.java).apply {
+
+        getContext().startService(Intent(getContext(), MonitorService::class.java).apply {
             action = MonitorService.ACTION_REFRESH
-        }
-        context.startService(intent)
-        // Basic feedback: stop refreshing after a delay
+        })
+
         isRefreshing = true
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        viewModelScope.launch {
+            delay(1000)
             isRefreshing = false
-        }, 1000)
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
-        getApplication<Application>().unregisterReceiver(statusReceiver)
+        getContext().unregisterReceiver(statusReceiver)
     }
 }
