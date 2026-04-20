@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
                         ) == PackageManager.PERMISSION_GRANTED
                     } else true
 
-                    // Only auto-start if we have permission. 
+                    // Only auto-start if we have permission.
                     // If not, the user will have to click "Start Monitoring" manually which triggers the request.
                     if (hasPerm) {
                         viewModel.toggleMonitoring(true)
@@ -130,6 +130,7 @@ fun DeviceMonitorScreen(viewModel: DeviceViewModel) {
     var draggedItemIndex by remember { mutableIntStateOf(-1) }
     var draggingOffset by remember { mutableFloatStateOf(0f) }
     var showIntervalDialog by remember { mutableStateOf(false) }
+    var pendingImportJson by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -145,7 +146,7 @@ fun DeviceMonitorScreen(viewModel: DeviceViewModel) {
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let {
                 context.contentResolver.openInputStream(it)?.bufferedReader()?.use { reader ->
-                    viewModel.importConfig(context, reader.readText())
+                    pendingImportJson = reader.readText()
                 }
             }
         }
@@ -154,6 +155,23 @@ fun DeviceMonitorScreen(viewModel: DeviceViewModel) {
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             if (it) viewModel.toggleMonitoring(true)
         }
+
+    if (pendingImportJson != null) {
+        AlertDialog(
+            onDismissRequest = { pendingImportJson = null },
+            title = { Text("Import Configuration") },
+            text = { Text("This will overwrite all existing devices and settings. Are you sure?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportJson?.let { viewModel.importConfig(context, it) }
+                    pendingImportJson = null
+                }) { Text("Import") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImportJson = null }) { Text("Cancel") }
+            }
+        )
+    }
 
     if (showIntervalDialog) {
         var tempInterval by remember { mutableStateOf((viewModel.pingIntervalMs / 1000).toString()) }
