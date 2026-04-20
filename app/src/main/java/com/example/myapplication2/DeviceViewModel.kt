@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +22,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     var editingDevice by mutableStateOf<Device?>(null)
     var isAdding by mutableStateOf(false)
-    var pingIntervalMs by mutableStateOf(5000L)
+    var pingIntervalMs by mutableLongStateOf(5000L)
         private set
 
     fun startAdding() {
@@ -97,11 +98,6 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun updatePingInterval(intervalMs: Long) {
         pingIntervalMs = intervalMs
         DeviceStore.saveInterval(getApplication(), intervalMs)
-        // Restart service if running to apply new interval immediately
-        if (isMonitoring) {
-            toggleMonitoring(false)
-            toggleMonitoring(true)
-        }
     }
 
     override fun onCleared() {
