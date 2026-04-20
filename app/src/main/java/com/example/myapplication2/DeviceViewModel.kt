@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -102,6 +103,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun refresh() {
+        if (!isMonitoring) {
+            Toast.makeText(getApplication(), "Monitoring not enabled", Toast.LENGTH_SHORT).show()
+            return
+        }
         val context = getApplication<Application>()
         val intent = Intent(context, MonitorService::class.java).apply {
             action = MonitorService.ACTION_REFRESH
