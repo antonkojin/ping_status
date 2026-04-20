@@ -113,6 +113,21 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         DeviceStore.saveInterval(getContext(), intervalMs)
     }
 
+    fun exportConfig(context: Context): String = DeviceStore.exportConfig(context)
+
+    fun importConfig(context: Context, json: String) {
+        if (DeviceStore.importConfig(context, json)) {
+            loadDevices()
+            pingIntervalMs = DeviceStore.loadInterval(context)
+            if (isMonitoring) {
+                refresh()
+            }
+            Toast.makeText(context, "Config imported successfully", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Failed to import config", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun refresh() {
         if (!isMonitoring) {
             Toast.makeText(getContext(), "Monitoring not enabled", Toast.LENGTH_SHORT).show()

@@ -5,6 +5,7 @@ import android.app.ActivityManager
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +33,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -113,6 +116,25 @@ fun DeviceMonitorScreen(viewModel: DeviceViewModel) {
     var draggingOffset by remember { mutableFloatStateOf(0f) }
     var showIntervalDialog by remember { mutableStateOf(false) }
 
+    val exportLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            uri?.let {
+                context.contentResolver.openOutputStream(it)?.use { stream ->
+                    stream.write(viewModel.exportConfig(context).toByteArray())
+                    Toast.makeText(context, "Config exported", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+    val importLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let {
+                context.contentResolver.openInputStream(it)?.bufferedReader()?.use { reader ->
+                    viewModel.importConfig(context, reader.readText())
+                }
+            }
+        }
+
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             if (it) viewModel.toggleMonitoring(true)
@@ -150,6 +172,12 @@ fun DeviceMonitorScreen(viewModel: DeviceViewModel) {
             TopAppBar(
                 title = { Text("PingStatus") },
                 actions = {
+                    IconButton(onClick = { importLauncher.launch("application/json") }) {
+                        Icon(Icons.Default.FileDownload, "Import")
+                    }
+                    IconButton(onClick = { exportLauncher.launch("ping_status_config.json") }) {
+                        Icon(Icons.Default.FileUpload, "Export")
+                    }
                     IconButton(onClick = {
                         showIntervalDialog = true
                     }) { Icon(Icons.Default.Settings, "Settings") }

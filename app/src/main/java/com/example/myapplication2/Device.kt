@@ -59,4 +59,32 @@ object DeviceStore {
 
     fun loadInterval(context: Context) =
         getPrefs(context).getLong(KEY_INTERVAL, DEFAULT_INTERVAL)
+
+    fun exportConfig(context: Context): String {
+        val obj = JSONObject().apply {
+            val devicesArray =
+                JSONArray().apply { loadDevices(context).forEach { put(it.toJsonObject()) } }
+            put("devices", devicesArray)
+            put("interval", loadInterval(context))
+        }
+        return obj.toString(4)
+    }
+
+    fun importConfig(context: Context, json: String): Boolean {
+        return try {
+            val obj = JSONObject(json)
+            val devicesArray = obj.getJSONArray("devices")
+            val devices = List(devicesArray.length()) { i ->
+                Device.fromJsonObject(
+                    devicesArray.getJSONObject(i)
+                )
+            }
+            val interval = obj.optLong("interval", DEFAULT_INTERVAL)
+            saveDevices(context, devices)
+            saveInterval(context, interval)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
 }
