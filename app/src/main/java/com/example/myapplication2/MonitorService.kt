@@ -51,7 +51,7 @@ class MonitorService : Service() {
                 NotificationChannel(
                     CHANNEL_ID,
                     "Device Monitor Channel",
-                    NotificationManager.IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_HIGH
                 )
             )
         }
@@ -156,7 +156,7 @@ class MonitorService : Service() {
             .addAction(0, "Refresh", actionIntent(ACTION_REFRESH))
             .addAction(0, "Stop", actionIntent(ACTION_STOP_SERVICE))
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
     }
 
