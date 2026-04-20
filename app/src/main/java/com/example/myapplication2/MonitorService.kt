@@ -65,7 +65,7 @@ class MonitorService : Service() {
                 if (monitoringJob == null) {
                     startForeground(
                         NOTIFICATION_ID,
-                        createNotification("Ping Status", "Starting...")
+                        createNotification("Starting...")
                     )
                     startMonitoring()
                 }
@@ -128,11 +128,11 @@ class MonitorService : Service() {
         }
         notificationManager.notify(
             NOTIFICATION_ID,
-            createNotification("Ping Status", summary, details)
+            createNotification(summary, details)
         )
     }
 
-    private fun createNotification(title: String, content: String, bigText: String? = null): Notification {
+    private fun createNotification(content: String, bigText: String? = null): Notification {
         val intent = { action: String? ->
             val i = if (action == null) Intent(this, MainActivity::class.java) else Intent(
                 this,
@@ -148,7 +148,7 @@ class MonitorService : Service() {
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title).setContentText(content)
+            .setContentText(content)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(intent(null))
             .setPriority(NotificationCompat.PRIORITY_LOW).setSilent(true).setOngoing(true)
