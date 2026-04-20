@@ -151,7 +151,9 @@ class MonitorService : Service() {
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(intent(null))
-            .setPriority(NotificationCompat.PRIORITY_LOW).setSilent(true).setOngoing(true)
+//            .setPriority(NotificationCompat.PRIORITY_HIGH)
+//            .setSilent(false)
+            .setOngoing(true)
             .addAction(0, "Refresh", intent(ACTION_REFRESH))
             .addAction(0, "Stop Monitoring", intent(ACTION_STOP_SERVICE))
             .apply {
