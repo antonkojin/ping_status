@@ -85,7 +85,22 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: DeviceViewModel = viewModel()
             LaunchedEffect(Unit) {
-                if (isServiceRunning()) viewModel.setMonitoringState(true)
+                if (isServiceRunning()) {
+                    viewModel.setMonitoringState(true)
+                } else {
+                    val hasPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) == PackageManager.PERMISSION_GRANTED
+                    } else true
+
+                    // Only auto-start if we have permission. 
+                    // If not, the user will have to click "Start Monitoring" manually which triggers the request.
+                    if (hasPerm) {
+                        viewModel.toggleMonitoring(true)
+                    }
+                }
             }
             MyApplication2Theme { MainNavigation(viewModel) }
         }
