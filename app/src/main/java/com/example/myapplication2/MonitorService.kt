@@ -30,7 +30,12 @@ class MonitorService : Service() {
     private val pingDispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
     private var lastDetails: String? = null
 
+    private external fun nativePing(host: String): Boolean
+
     companion object {
+        init {
+            System.loadLibrary("myapplication2")
+        }
         const val CHANNEL_ID = "DeviceMonitorChannel"
         const val NOTIFICATION_ID = 1
         const val ACTION_STATUS_CHANGED = "com.example.myapplication2.STATUS_CHANGED"
@@ -105,7 +110,7 @@ class MonitorService : Service() {
 
     private fun ping(host: String?): Boolean = try {
         if (host.isNullOrEmpty()) false
-        else Runtime.getRuntime().exec("ping -c 1 -w 1 $host").waitFor() == 0
+        else nativePing(host)
     } catch (_: Exception) {
         false
     }
