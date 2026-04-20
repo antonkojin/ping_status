@@ -66,7 +66,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         devices.addAll(DeviceStore.loadDevices(getContext()))
     }
 
-    fun saveDevices() = DeviceStore.saveDevices(getContext(), devices)
+    fun saveDevices() {
+        DeviceStore.saveDevices(getContext(), devices)
+        if (isMonitoring) {
+            getContext().startService(Intent(getContext(), MonitorService::class.java).apply {
+                action = MonitorService.ACTION_REFRESH
+            })
+        }
+    }
 
     fun startAdding() {
         isAdding = true
@@ -94,6 +101,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setMonitoringState(running: Boolean) {
         isMonitoring = running
+        if (running) {
+            getContext().startService(Intent(getContext(), MonitorService::class.java).apply {
+                action = MonitorService.ACTION_GET_ALL_STATUSES
+            })
+        }
     }
 
     fun updatePingInterval(intervalMs: Long) {

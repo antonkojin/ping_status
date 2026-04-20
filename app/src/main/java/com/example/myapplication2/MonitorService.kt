@@ -36,6 +36,7 @@ class MonitorService : Service() {
         const val ACTION_MONITOR_STOPPED = "com.example.myapplication2.MONITOR_STOPPED"
         const val ACTION_STOP_SERVICE = "com.example.myapplication2.STOP_SERVICE"
         const val ACTION_REFRESH = "com.example.myapplication2.REFRESH"
+        const val ACTION_GET_ALL_STATUSES = "com.example.myapplication2.GET_ALL_STATUSES"
         const val EXTRA_DEVICE_ID = "extra_device_id"
         const val EXTRA_STATUS = "extra_status"
     }
@@ -59,6 +60,7 @@ class MonitorService : Service() {
         when (intent?.action) {
             ACTION_STOP_SERVICE -> stopSelf()
             ACTION_REFRESH -> triggerRefresh()
+            ACTION_GET_ALL_STATUSES -> broadcastAllStatuses()
             else -> {
                 if (monitoringJob == null) {
                     startForeground(
@@ -69,7 +71,6 @@ class MonitorService : Service() {
                 }
             }
         }
-        broadcastAllStatuses()
         return START_STICKY
     }
 
