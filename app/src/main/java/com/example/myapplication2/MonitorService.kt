@@ -39,6 +39,7 @@ class MonitorService : Service() {
         const val ACTION_STATUS_CHANGED = "com.example.myapplication2.STATUS_CHANGED"
         const val ACTION_MONITOR_STOPPED = "com.example.myapplication2.MONITOR_STOPPED"
         const val ACTION_STOP_SERVICE = "com.example.myapplication2.STOP_SERVICE"
+        const val ACTION_REFRESH = "com.example.myapplication2.REFRESH"
         const val EXTRA_DEVICE_ID = "extra_device_id"
         const val EXTRA_STATUS = "extra_status"
     }
@@ -56,6 +57,10 @@ class MonitorService : Service() {
             return START_NOT_STICKY
         }
 
+        if (intent?.action == ACTION_REFRESH) {
+            triggerRefresh()
+        }
+
         if (monitoringJob == null) {
             startForeground(NOTIFICATION_ID, createNotification("Ping Status", "Starting..."))
             startMonitoring()
@@ -63,6 +68,29 @@ class MonitorService : Service() {
 
         broadcastAllStatuses()
         return START_STICKY
+    }
+
+    private fun triggerRefresh() {
+        serviceScope.launch {
+            try {
+                val devices = DeviceStore.loadDevices(this@MonitorService)
+                val enabledDevices = devices.filter { it.isEnabled }
+
+                enabledDevices.map { device ->
+                    launch {
+                        val currentStatus = withContext(pingDispatcher) { ping(device.ip) }
+                        if (currentStatus != deviceStatuses[device.id]) {
+                            deviceStatuses[device.id] = currentStatus
+                            broadcastStatus(device.id, currentStatus)
+                        }
+                    }
+                }.joinAll()
+
+                updateNotification(enabledDevices)
+            } catch (e: Exception) {
+                Log.e("MonitorService", "Error in refresh", e)
+            }
+        }
     }
 
     private fun startMonitoring() {

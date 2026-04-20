@@ -22,6 +22,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     var editingDevice by mutableStateOf<Device?>(null)
     var isAdding by mutableStateOf(false)
+    var isRefreshing by mutableStateOf(false)
     var pingIntervalMs by mutableLongStateOf(5000L)
         private set
 
@@ -98,6 +99,19 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun updatePingInterval(intervalMs: Long) {
         pingIntervalMs = intervalMs
         DeviceStore.saveInterval(getApplication(), intervalMs)
+    }
+
+    fun refresh() {
+        val context = getApplication<Application>()
+        val intent = Intent(context, MonitorService::class.java).apply {
+            action = MonitorService.ACTION_REFRESH
+        }
+        context.startService(intent)
+        // Basic feedback: stop refreshing after a delay
+        isRefreshing = true
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            isRefreshing = false
+        }, 1000)
     }
 
     override fun onCleared() {

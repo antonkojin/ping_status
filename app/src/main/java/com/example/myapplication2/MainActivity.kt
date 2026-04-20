@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -175,71 +176,79 @@ fun DeviceMonitorScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            if (viewModel.devices.isEmpty()) {
-                EmptyState()
-            } else {
-                LazyColumn(
-                    state = lazyListState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .pointerInput(Unit) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { offset ->
-                                    lazyListState.layoutInfo.visibleItemsInfo
-                                        .firstOrNull { offset.y.toInt() in it.offset..(it.offset + it.size) }
-                                        ?.takeIf { it.index < viewModel.devices.size }
-                                        ?.let { draggedItemIndex = it.index }
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    draggingOffset += dragAmount.y
-                                    val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-                                    val currentItem =
-                                        visibleItems.firstOrNull { it.index == draggedItemIndex }
-                                    if (currentItem != null) {
-                                        val currentCenter =
-                                            currentItem.offset + currentItem.size / 2 + draggingOffset
-                                        visibleItems.firstOrNull { it.index != draggedItemIndex && currentCenter.toInt() in it.offset..(it.offset + it.size) }
+            PullToRefreshBox(
+                isRefreshing = viewModel.isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.weight(1f)
+            ) {
+                if (viewModel.devices.isEmpty()) {
+                    EmptyState()
+                } else {
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { offset ->
+                                        lazyListState.layoutInfo.visibleItemsInfo
+                                            .firstOrNull { offset.y.toInt() in it.offset..(it.offset + it.size) }
                                             ?.takeIf { it.index < viewModel.devices.size }
-                                            ?.let { target ->
-                                                draggingOffset += if (target.index > draggedItemIndex) {
-                                                    currentItem.offset - target.offset - target.size + currentItem.size
-                                                } else {
-                                                    currentItem.offset - target.offset
+                                            ?.let { draggedItemIndex = it.index }
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        draggingOffset += dragAmount.y
+                                        val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+                                        val currentItem =
+                                            visibleItems.firstOrNull { it.index == draggedItemIndex }
+                                        if (currentItem != null) {
+                                            val currentCenter =
+                                                currentItem.offset + currentItem.size / 2 + draggingOffset
+                                            visibleItems.firstOrNull { it.index != draggedItemIndex && currentCenter.toInt() in it.offset..(it.offset + it.size) }
+                                                ?.takeIf { it.index < viewModel.devices.size }
+                                                ?.let { target ->
+                                                    draggingOffset += if (target.index > draggedItemIndex) {
+                                                        currentItem.offset - target.offset - target.size + currentItem.size
+                                                    } else {
+                                                        currentItem.offset - target.offset
+                                                    }
+                                                    viewModel.devices.add(
+                                                        target.index,
+                                                        viewModel.devices.removeAt(draggedItemIndex)
+                                                    )
+                                                    draggedItemIndex = target.index
                                                 }
-                                                viewModel.devices.add(
-                                                    target.index,
-                                                    viewModel.devices.removeAt(draggedItemIndex)
-                                                )
-                                                draggedItemIndex = target.index
-                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        viewModel.saveDevices(); draggedItemIndex =
+                                        -1; draggingOffset =
+                                        0f
+                                    },
+                                    onDragCancel = {
+                                        viewModel.saveDevices(); draggedItemIndex =
+                                        -1; draggingOffset =
+                                        0f
                                     }
-                                },
-                                onDragEnd = {
-                                    viewModel.saveDevices(); draggedItemIndex = -1; draggingOffset =
-                                    0f
-                                },
-                                onDragCancel = {
-                                    viewModel.saveDevices(); draggedItemIndex = -1; draggingOffset =
-                                    0f
-                                }
+                                )
+                            }
+                    ) {
+                        itemsIndexed(viewModel.devices, key = { _, d -> d.id }) { index, device ->
+                            val isDragging = index == draggedItemIndex
+                            DeviceStatusItem(
+                                device = device,
+                                isOn = viewModel.deviceStatuses[device.id],
+                                isMonitoring = viewModel.isMonitoring,
+                                onClick = { viewModel.startEditing(device) },
+                                modifier = Modifier
+                                    .zIndex(if (isDragging) 1f else 0f)
+                                    .graphicsLayer {
+                                        translationY = if (isDragging) draggingOffset else 0f
+                                    }
+                                    .then(if (isDragging) Modifier else Modifier.animateItem())
                             )
                         }
-                ) {
-                    itemsIndexed(viewModel.devices, key = { _, d -> d.id }) { index, device ->
-                        val isDragging = index == draggedItemIndex
-                        DeviceStatusItem(
-                            device = device,
-                            isOn = viewModel.deviceStatuses[device.id],
-                            isMonitoring = viewModel.isMonitoring,
-                            onClick = { viewModel.startEditing(device) },
-                            modifier = Modifier
-                                .zIndex(if (isDragging) 1f else 0f)
-                                .graphicsLayer {
-                                    translationY = if (isDragging) draggingOffset else 0f
-                                }
-                                .then(if (isDragging) Modifier else Modifier.animateItem())
-                        )
                     }
                 }
             }
