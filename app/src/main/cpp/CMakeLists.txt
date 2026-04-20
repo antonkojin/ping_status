@@ -13,4 +13,5 @@ find_library(
 
 target_link_libraries(
         myapplication2
+        android
         ${log-lib})

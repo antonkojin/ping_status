@@ -30,6 +30,8 @@ class MonitorService : Service() {
     private val pingDispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
     private var lastDetails: String? = null
 
+    private external fun startNativeMonitor(interval: Long)
+    private external fun stopNativeMonitor()
     private external fun nativePing(host: String): Boolean
 
     companion object {
@@ -85,12 +87,14 @@ class MonitorService : Service() {
     }
 
     private fun startMonitoring() {
+        startNativeMonitor(DeviceStore.loadInterval(this))
         monitoringJob = serviceScope.launch {
             while (isActive) {
                 val devices = DeviceStore.loadDevices(this@MonitorService).filter { it.isEnabled }
                 deviceStatuses.keys.retainAll(devices.map { it.id }.toSet())
-                performPingCycle(devices)
+                // Native loop is running, we just sync notification
                 delay(DeviceStore.loadInterval(this@MonitorService))
+                updateNotification(devices)
             }
         }
     }
@@ -166,6 +170,7 @@ class MonitorService : Service() {
     }
 
     override fun onDestroy() {
+        stopNativeMonitor()
         serviceScope.cancel()
         pingDispatcher.close()
         sendBroadcast(Intent(ACTION_MONITOR_STOPPED).apply { setPackage(packageName) })

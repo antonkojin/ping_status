@@ -20,7 +20,13 @@ import kotlinx.coroutines.launch
 
 class DeviceViewModel(application: Application) : AndroidViewModel(application) {
     val devices = mutableStateListOf<Device>()
-    val deviceStatuses = mutableStateMapOf<String, Boolean>()
+    val deviceStatuses = mutableStateMapOf<String, Boolean?>()
+
+    init {
+        System.loadLibrary("myapplication2")
+    }
+
+    private external fun getNativeStatus(deviceId: String): Int
 
     var isMonitoring by mutableStateOf(false)
         private set
@@ -49,6 +55,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     init {
         loadDevices()
         pingIntervalMs = DeviceStore.loadInterval(application)
+
+        // Push initial devices to native
+        DeviceStore.saveDevices(application, devices)
+
         val filter = IntentFilter().apply {
             addAction(MonitorService.ACTION_STATUS_CHANGED)
             addAction(MonitorService.ACTION_MONITOR_STOPPED)
@@ -59,6 +69,25 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             filter,
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
+
+        // Poll native status for sync
+        viewModelScope.launch {
+            while (true) {
+                if (isMonitoring) {
+                    devices.forEach { device ->
+                        val status = getNativeStatus(device.id)
+                        if (status != -2) { // NOT_FOUND
+                            deviceStatuses[device.id] = when (status) {
+                                1 -> true
+                                0 -> false
+                                else -> null
+                            }
+                        }
+                    }
+                }
+                delay(1000)
+            }
+        }
     }
 
     fun loadDevices() {

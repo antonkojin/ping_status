@@ -36,12 +36,19 @@ object DeviceStore {
     private const val KEY_INTERVAL = "interval"
     private const val DEFAULT_INTERVAL = 5000L
 
+    init {
+        System.loadLibrary("myapplication2")
+    }
+
+    private external fun setNativeDevices(devices: Array<Device>)
+
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun saveDevices(context: Context, devices: List<Device>) {
         val array = JSONArray()
         devices.forEach { array.put(it.toJsonObject()) }
         prefs(context).edit { putString(KEY_DEVICES, array.toString()) }
+        setNativeDevices(devices.toTypedArray())
     }
 
     fun loadDevices(context: Context): List<Device> {
