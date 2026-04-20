@@ -28,7 +28,6 @@ class MonitorService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var monitoringJob: Job? = null
     private val pingDispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
-    private var lastSummary: String? = null
     private var lastDetails: String? = null
 
     companion object {
@@ -122,51 +121,31 @@ class MonitorService : Service() {
         deviceStatuses.forEach { (id, status) -> broadcastStatus(id, status) }
 
     private fun updateNotification(devices: List<Device>) {
-        val details = if (devices.isEmpty()) null else devices.joinToString("\n") {
-            "${it.name}: ${if (deviceStatuses[it.id] == true) "ON" else "OFF"}" 
+        val details = if (devices.isEmpty()) "No active devices" else devices.joinToString("\n") {
+            "${it.name}:${if (deviceStatuses[it.id] == true) "ON" else "OFF"}"
         }
-        val summary = details ?: "No active devices"
-
-        if (summary == lastSummary && details == lastDetails) return
-        lastSummary = summary
+        if (details == lastDetails) return
         lastDetails = details
-
-        notificationManager.notify(
-            NOTIFICATION_ID,
-            createNotification(summary, details)
-        )
+        notificationManager.notify(NOTIFICATION_ID, createNotification(details))
     }
 
-    private fun createNotification(content: String, bigText: String? = null): Notification {
+    private fun createNotification(content: String): Notification {
         val intent = { action: String? ->
-            val i = if (action == null) Intent(this, MainActivity::class.java) else Intent(
-                this,
-                MonitorService::class.java
-            ).apply { this.action = action }
+            val i = if (action == null) Intent(this, MainActivity::class.java)
+            else Intent(this, MonitorService::class.java).apply { this.action = action }
             val flag = PendingIntent.FLAG_IMMUTABLE
-            if (action == null) PendingIntent.getActivity(
-                this,
-                0,
-                i,
-                flag
-            ) else PendingIntent.getService(this, 1, i, flag)
+            if (action == null) PendingIntent.getActivity(this, 0, i, flag)
+            else PendingIntent.getService(this, 1, i, flag)
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(intent(null))
-//            .setPriority(NotificationCompat.PRIORITY_LOW)
-//            .setSilent(true)
-//            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .addAction(0, "Refresh", intent(ACTION_REFRESH))
             .addAction(0, "Stop Monitoring", intent(ACTION_STOP_SERVICE))
-            .apply {
-                if (bigText != null) setStyle(
-                    NotificationCompat.BigTextStyle().bigText(bigText)
-                )
-            }
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .build()
     }
 
